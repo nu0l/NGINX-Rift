@@ -1,4 +1,4 @@
-// 完整的、带有详尽注释的单文件 Go 语言脚本，用于检测 CVE-2026-42945 (NGINX Rift)
+// NGINX Rift — CVE-2026-42945 漏洞扫描与验证工具
 package main
 
 import (
@@ -28,7 +28,7 @@ const (
 
 func printBanner() {
 	fmt.Println(ColorCyan + strings.Repeat("=", 65) + ColorReset)
-	fmt.Println(ColorCyan + " NGINX Rift (CVE-2026-42945) 漏洞扫描与验证工具" + ColorReset)
+	fmt.Println(ColorCyan + " NGINX Rift — CVE-2026-42945 Vulnerability Scanner" + ColorReset)
 	fmt.Println(ColorCyan + strings.Repeat("=", 65) + ColorReset)
 }
 
@@ -39,14 +39,14 @@ func printHelp() {
   ./nginx_rift_scanner-linux -h
 
   [网络扫描模式 - Scan]
-  ./nginx_rift_scanner-[具体环境版本] scan -u http://example.com            # 扫描单个目标，获取服务器响应及 NGINX 版本
-  ./nginx_rift_scanner-[具体环境版本] scan -f url.txt                       # 批量扫描，从 url.txt 读取目标列表
+  ./nginx_rift_scanner scan -u http://example.com            # 扫描单个目标，获取服务器响应及 NGINX 版本
+  ./nginx_rift_scanner scan -f url.txt                       # 批量扫描，从 url.txt 读取目标列表
 
   [本地验证模式 - Verify]
-  ./nginx_rift_scanner-[具体环境版本] verify                                # 自动查找默认 NGINX 配置文件进行深度分析
-  ./nginx_rift_scanner-[具体环境版本] verify -p /etc/nginx/nginx.conf       # 扫描指定的本地 NGINX 配置文件
+  ./nginx_rift_scanner verify                                # 自动查找默认 NGINX 配置文件进行深度分析
+  ./nginx_rift_scanner verify -p /etc/nginx/nginx.conf       # 扫描指定的本地 NGINX 配置文件
   
-  ./nginx_rift_scanner-[具体环境版本] -h                                    # 输出本使用教程
+  ./nginx_rift_scanner -h                                    # 输出本使用教程
 
 
 工具说明:
@@ -61,7 +61,7 @@ func printHelp() {
 }
 
 func main() {
-	printBanner() // 每次运行都打印尊安科技的 Banner
+	printBanner()
 
 	if len(os.Args) < 2 {
 		printHelp()
@@ -309,7 +309,7 @@ func isPlusVersionInVulnerableRange(plusVersion string) bool {
 }
 
 func printRemediation() {
-	fmt.Println("\n" + ColorCyan + "=== 尊安科技修复与缓解建议 ===" + ColorReset)
+	fmt.Println("\n" + ColorCyan + "=== 修复与缓解建议 ===" + ColorReset)
 	fmt.Println(ColorYellow + "方案一：紧急配置缓解 (推荐，无需停机重启即可生效)" + ColorReset)
 	fmt.Println("   若无法立即升级，请修改 nginx.conf。将包含未命名捕获组($1,$2)和问号(?)的 rewrite 改为命名捕获组。")
 	fmt.Println("   [存在漏洞] rewrite ^/api/(.*)$ /internal?id=$1 last;")

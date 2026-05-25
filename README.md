@@ -56,11 +56,11 @@ rewrite ^/api/(?<myid>.*)$ /internal?id=$myid last;
 ### 方式二：源码编译
 
 ```bash
-git clone https://github.com/ZunAn-Tech/NGINX-Rift.git
+git clone https://github.com/nu0l/NGINX-Rift.git
 cd NGINX-Rift
 
 # 单平台编译
-go build -o nginx_rift_scanner zakj_nginx_rift_scanner.go
+go build -o nginx_rift_scanner nginx_rift_scanner.go
 
 # 全平台交叉编译
 chmod +x build.sh && ./build.sh
@@ -71,17 +71,17 @@ chmod +x build.sh && ./build.sh
 ### 查看帮助
 
 ```bash
-./zakj_nginx_rift_scanner -h
+./nginx_rift_scanner -h
 ```
 
 ### Scan 模式 — 远程网络扫描
 
 ```bash
 # 扫描单个目标
-./zakj_nginx_rift_scanner scan -u http://example.com
+./nginx_rift_scanner scan -u http://example.com
 
 # 批量扫描（从文件读取 URL 列表）
-./zakj_nginx_rift_scanner scan -f url.txt
+./nginx_rift_scanner scan -f url.txt
 ```
 
 `url.txt` 每行一个 URL，例如：
@@ -96,10 +96,10 @@ target3.com
 
 ```bash
 # 自动查找默认 NGINX 配置路径
-./zakj_nginx_rift_scanner verify
+./nginx_rift_scanner verify
 
 # 指定配置文件路径
-./zakj_nginx_rift_scanner verify -p /etc/nginx/nginx.conf
+./nginx_rift_scanner verify -p /etc/nginx/nginx.conf
 ```
 
 Verify 模式执行三步审计：
@@ -122,7 +122,7 @@ Verify 模式执行三步审计：
 
 ```
 NGINX-Rift/
-├── zakj_nginx_rift_scanner.go    # 主程序源码
+├── nginx_rift_scanner.go         # 主程序源码
 ├── build.sh                      # 全平台交叉编译脚本
 ├── go.mod                        # Go 模块定义
 └── README.md
@@ -143,4 +143,4 @@ MIT License
 
 ## 致谢
 
-由 [尊安科技 (ZunAn Technology)](https://github.com/ZunAn-Tech) 安全团队开发。
+由安全社区贡献。
