@@ -1,4 +1,4 @@
-// NGINX Rift — CVE-2026-42945 漏洞扫描与验证工具
+// NGINX Rift — CVE-2026-42945 / CVE-2026-9256 漏洞扫描与验证工具
 package main
 
 import (
@@ -28,7 +28,7 @@ const (
 
 func printBanner() {
 	fmt.Println(ColorCyan + strings.Repeat("=", 65) + ColorReset)
-	fmt.Println(ColorCyan + " NGINX Rift — CVE-2026-42945 Vulnerability Scanner" + ColorReset)
+	fmt.Println(ColorCyan + " NGINX Rift — CVE-2026-42945 / CVE-2026-9256 Scanner" + ColorReset)
 	fmt.Println(ColorCyan + strings.Repeat("=", 65) + ColorReset)
 }
 
@@ -50,14 +50,15 @@ func printHelp() {
 
 
 工具说明:
-  【Scan 模式】关注 HTTP 响应头中的版本指纹暴露。支持识别 NGINX 开源版及 NGINX Plus (R系列) 商业版。
-   注: 由于 Linux 发行版(如 CentOS/Ubuntu)的“向后移植(Backport)”特性，
+  【Scan 模式】关注 HTTP 响应头中的版本指纹暴露 (覆盖 CVE-2026-42945 / CVE-2026-9256)。
+   支持识别 NGINX 开源版及 NGINX Plus (R系列) 商业版。
+   注: 由于 Linux 发行版(如 CentOS/Ubuntu)的”向后移植(Backport)”特性，
        低版本可能已在内部打了补丁（产生版本错觉）。此模式兼具检查隐藏响应头的功能。
   
   【Verify 模式】关注漏洞的核心触发条件：
-   1. 原生 NGINX: 配置文件中是否存在危险的 rewrite 规则 (包含 '?' 和 未命名捕获组如 '$1')。
+   1. 原生 NGINX: 配置文件中是否存在危险的 rewrite 规则 (包含未命名捕获组如 '$1','$2'，尤其是带 '?' 分隔符的场景)。
    2. K8s Ingress: YAML 文件中是否存在危险的 rewrite-target 注解配置。
-   同时联动底层操作系统的包管理器(apt/yum)进行安全基线检查。`)
+   同时联动底层操作系统的包管理器(apt/yum)进行安全基线检查 (同时覆盖 CVE-2026-42945 和 CVE-2026-9256)。`)
 }
 
 func main() {
@@ -227,7 +228,7 @@ func runScan(targetURL string) (bool, bool, bool) {
 	if plusVersion != "" {
 		fmt.Printf(ColorYellow+"[!] 发现 NGINX Plus (商业版) 版本暴露: %s\n"+ColorReset, plusVersion)
 		if isPlusVersionInVulnerableRange(plusVersion) {
-			fmt.Println(ColorRed + "[!] 警告: 该版本在 NGINX Plus 的已知受影响范围内 (R32 - R36)!" + ColorReset)
+			fmt.Println(ColorRed + "[!] 警告: 该版本在 NGINX Plus 的已知受影响范围内 (R32 - R36)，涉及 CVE-2026-42945 / CVE-2026-9256!" + ColorReset)
 			return true, false, true
 		} else {
 			fmt.Println(ColorGreen + "[+] 该商业版本不在已知的受影响范围内。" + ColorReset)
@@ -236,7 +237,7 @@ func runScan(targetURL string) (bool, bool, bool) {
 	} else {
 		fmt.Printf(ColorYellow+"[!] 发现 NGINX 开源版版本暴露: %s\n"+ColorReset, version)
 		if isVersionInVulnerableRange(version) {
-			fmt.Println(ColorRed + "[!] 警告: 该版本在 CVE-2026-42945 的潜在受影响范围内 (0.6.27 - 1.30.0)!" + ColorReset)
+			fmt.Println(ColorRed + "[!] 警告: 该版本在 CVE-2026-42945 / CVE-2026-9256 的潜在受影响范围内 (0.1.17 - 1.31.0)!" + ColorReset)
 			fmt.Println(ColorYellow + "    -> 请注意: 即使版本匹配，如果系统是由 APT/YUM 包管理器安装，补丁可能已被向后移植(Backported)。")
 			fmt.Println("    -> 同时，漏洞的触发强依赖于特定的 rewrite 配置。建议使用 verify 模式在服务器本地进行确认。" + ColorReset)
 			return true, false, true
@@ -266,7 +267,7 @@ func extractPlusVersion(serverHeader string) string {
 	return ""
 }
 
-// 检查是否在 0.6.27 到 1.30.0 之间
+// 检查是否在 CVE-2026-42945 / CVE-2026-9256 的受影响范围内 (0.1.17 - 1.31.0)
 func isVersionInVulnerableRange(version string) bool {
 	parts := strings.Split(version, ".")
 	if len(parts) != 3 {
@@ -276,16 +277,23 @@ func isVersionInVulnerableRange(version string) bool {
 	minor, _ := strconv.Atoi(parts[1])
 	patch, _ := strconv.Atoi(parts[2])
 
-	if major == 0 && minor == 6 && patch >= 27 {
+	// 版本 < 0.1.17 不受影响
+	if major == 0 && minor == 1 && patch < 17 {
+		return false
+	}
+	// 0.1.17 <= 版本 < 1.0.0
+	if major == 0 && minor >= 1 {
 		return true
 	}
-	if major == 0 && minor > 6 {
-		return true
-	}
+	// 1.0.0 <= 版本 <= 1.30.1 (stable 受影响)
 	if major == 1 && minor < 30 {
 		return true
 	}
-	if major == 1 && minor == 30 && patch == 0 {
+	if major == 1 && minor == 30 && patch <= 1 {
+		return true
+	}
+	// 1.31.0 (mainline 受影响)
+	if major == 1 && minor == 31 && patch == 0 {
 		return true
 	}
 	return false
@@ -309,15 +317,16 @@ func isPlusVersionInVulnerableRange(plusVersion string) bool {
 }
 
 func printRemediation() {
-	fmt.Println("\n" + ColorCyan + "=== 修复与缓解建议 ===" + ColorReset)
+	fmt.Println("\n" + ColorCyan + "=== 修复与缓解建议 (CVE-2026-42945 / CVE-2026-9256) ===" + ColorReset)
 	fmt.Println(ColorYellow + "方案一：紧急配置缓解 (推荐，无需停机重启即可生效)" + ColorReset)
-	fmt.Println("   若无法立即升级，请修改 nginx.conf。将包含未命名捕获组($1,$2)和问号(?)的 rewrite 改为命名捕获组。")
+	fmt.Println("   若无法立即升级，请修改 nginx.conf。将包含未命名捕获组($1,$2)的 rewrite 改为命名捕获组。")
 	fmt.Println("   [存在漏洞] rewrite ^/api/(.*)$ /internal?id=$1 last;")
 	fmt.Println("   [安全配置] rewrite ^/api/(?<myid>.*)$ /internal?id=$myid last;")
+	fmt.Println("   尤其避免在 rewrite 中使用多个未命名捕获组引用 (CVE-2026-9256 核心触发条件)。")
 	fmt.Println("   修改后执行: nginx -t && nginx -s reload")
 
 	fmt.Println(ColorYellow + "\n方案二：云原生 K8s Ingress 缓解" + ColorReset)
-	fmt.Println("   排查所有 Ingress 资源，避免在 rewrite-target 注解中使用带问号和未命名捕获组的配置。")
+	fmt.Println("   排查所有 Ingress 资源，避免在 rewrite-target 注解中使用带未命名捕获组的配置。")
 	fmt.Println("   升级 NGINX Ingress Controller 至 3.7.3, 4.0.2 或 5.4.2 及以上版本。")
 
 	fmt.Println(ColorYellow + "\n方案三：操作系统包管理器更新 (Backport补丁)" + ColorReset)
@@ -326,8 +335,8 @@ func printRemediation() {
 	fmt.Println("   更新后，请通过本工具的 verify 模式确认是否包含安全基线补丁。")
 
 	fmt.Println(ColorYellow + "\n方案四：源码编译升级" + ColorReset)
-	fmt.Println("   将 NGINX 开源版升级至 1.30.1 / 1.31.0 或更高版本。")
-	fmt.Println("   商业版 NGINX Plus 请升级至 R32 P6, R36 P4 等包含补丁的安全版本。")
+	fmt.Println("   将 NGINX 开源版升级至 1.30.2 (stable) / 1.31.1 (mainline) 或更高版本。")
+	fmt.Println("   商业版 NGINX Plus 请升级至包含 CVE-2026-9256 补丁的安全版本。")
 
 	fmt.Println(ColorYellow + "\n方案五：纵深防御 (隐藏响应头版本暴露)" + ColorReset)
 	fmt.Println("   无论版本是否安全，当前服务器暴露了确切的 NGINX 版本号，为攻击者提供了指纹便利。")
@@ -408,7 +417,7 @@ func runVerify(customPath string) {
 					fmt.Println(ColorRed + "  [-] 最终判定: 危险配置存在，且核心组件未打补丁，系统处于【高危易受攻击】状态！" + ColorReset)
 				}
 			} else {
-				fmt.Println(ColorGreen + "  [+] 配置审计通过: 未在本地配置中发现 NGINX Rift 漏洞触发条件。" + ColorReset)
+				fmt.Println(ColorGreen + "  [+] 配置审计通过: 未在本地配置中发现 CVE-2026-42945 / CVE-2026-9256 漏洞触发条件。" + ColorReset)
 			}
 			break
 		}
@@ -532,9 +541,9 @@ func parseConfigForVulnerability(path string, visited map[string]bool) int {
 	return vulnCount
 }
 
-// 判断原生配置特征
+// 判断原生配置特征 (CVE-2026-42945: rewrite + ? + $N / CVE-2026-9256: rewrite + 多个 $N)
 func isVulnerableRewrite(line string) bool {
-	if !strings.Contains(line, "rewrite") || !strings.Contains(line, "?") {
+	if !strings.Contains(line, "rewrite") {
 		return false
 	}
 	re := regexp.MustCompile(`(?i)\s*rewrite\s+([^\s]+)\s+([^\s;]+)`)
@@ -542,6 +551,7 @@ func isVulnerableRewrite(line string) bool {
 
 	if len(matches) > 2 {
 		replacement := matches[2]
+		// CVE-2026-42945: 替换中含 ? 且含 $N
 		if strings.Contains(replacement, "?") {
 			for i := 1; i <= 9; i++ {
 				if strings.Contains(replacement, fmt.Sprintf("$%d", i)) {
@@ -549,21 +559,42 @@ func isVulnerableRewrite(line string) bool {
 				}
 			}
 		}
+		// CVE-2026-9256: 替换中含多个未命名捕获组引用 (PCRE 重叠捕获场景)
+		captureCount := 0
+		for i := 1; i <= 9; i++ {
+			if strings.Contains(replacement, fmt.Sprintf("$%d", i)) {
+				captureCount++
+			}
+		}
+		if captureCount >= 2 {
+			return true
+		}
 	}
 	return false
 }
 
-// 判断 K8s YAML 特征
+// 判断 K8s YAML 特征 (CVE-2026-42945 / CVE-2026-9256)
 func isVulnerableIngressAnnotation(line string) bool {
 	if !strings.Contains(line, "rewrite-target:") && !strings.Contains(line, "configuration-snippet:") {
 		return false
 	}
+	// CVE-2026-42945: ? + $N
 	if strings.Contains(line, "?") {
 		for i := 1; i <= 9; i++ {
 			if strings.Contains(line, fmt.Sprintf("$%d", i)) {
 				return true
 			}
 		}
+	}
+	// CVE-2026-9256: 多个 $N 捕获引用
+	captureCount := 0
+	for i := 1; i <= 9; i++ {
+		if strings.Contains(line, fmt.Sprintf("$%d", i)) {
+			captureCount++
+		}
+	}
+	if captureCount >= 2 {
+		return true
 	}
 	return false
 }
@@ -636,7 +667,7 @@ func checkDebianBaseline() bool {
 	} else {
 		return false
 	}
-	grepCmd := exec.Command("sh", "-c", "zgrep -i 'CVE-2026-42945' /usr/share/doc/nginx*/changelog.Debian.gz 2>/dev/null")
+	grepCmd := exec.Command("sh", "-c", "zgrep -iE 'CVE-2026-42945|CVE-2026-9256' /usr/share/doc/nginx*/changelog.Debian.gz 2>/dev/null")
 	output, err := grepCmd.Output()
 	if err == nil && len(output) > 0 {
 		fmt.Printf("    -> "+ColorGreen+"[发现补丁] Changelog 记录:\n%s"+ColorReset, strings.TrimSpace(string(output))+"\n")
@@ -653,7 +684,7 @@ func checkRedHatBaseline() bool {
 	} else {
 		return false
 	}
-	grepCmd := exec.Command("sh", "-c", "rpm -q --changelog nginx | grep -i 'CVE-2026-42945'")
+	grepCmd := exec.Command("sh", "-c", "rpm -q --changelog nginx | grep -iE 'CVE-2026-42945|CVE-2026-9256'")
 	output, err := grepCmd.Output()
 	if err == nil && len(output) > 0 {
 		fmt.Printf("    -> "+ColorGreen+"[发现补丁] RPM Changelog 记录:\n%s"+ColorReset, strings.TrimSpace(string(output))+"\n")
